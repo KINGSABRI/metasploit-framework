@@ -16,10 +16,12 @@ module Msf::DBManager::Import
   autoload :Acunetix, 'msf/core/db_manager/import/acunetix'
   autoload :Amap, 'msf/core/db_manager/import/amap'
   autoload :Appscan, 'msf/core/db_manager/import/appscan'
-  autoload :Burp, 'msf/core/db_manager/import/burp'
+  autoload :BurpIssue, 'msf/core/db_manager/import/burp_issue'
+  autoload :BurpSession, 'msf/core/db_manager/import/burp_session'
   autoload :CI, 'msf/core/db_manager/import/ci'
   autoload :Foundstone, 'msf/core/db_manager/import/foundstone'
   autoload :FusionVM, 'msf/core/db_manager/import/fusion_vm'
+  autoload :GPP, 'msf/core/db_manager/import/gpp'
   autoload :IP360, 'msf/core/db_manager/import/ip360'
   autoload :IPList, 'msf/core/db_manager/import/ip_list'
   autoload :Libpcap, 'msf/core/db_manager/import/libpcap'
@@ -41,10 +43,12 @@ module Msf::DBManager::Import
   include Msf::DBManager::Import::Acunetix
   include Msf::DBManager::Import::Amap
   include Msf::DBManager::Import::Appscan
-  include Msf::DBManager::Import::Burp
+  include Msf::DBManager::Import::BurpIssue
+  include Msf::DBManager::Import::BurpSession
   include Msf::DBManager::Import::CI
   include Msf::DBManager::Import::Foundstone
   include Msf::DBManager::Import::FusionVM
+  include Msf::DBManager::Import::GPP
   include Msf::DBManager::Import::IP360
   include Msf::DBManager::Import::IPList
   include Msf::DBManager::Import::Libpcap
@@ -83,10 +87,23 @@ module Msf::DBManager::Import
   # import_file_detect will raise an error if the filetype
   # is unknown.
   def import(args={}, &block)
+    wspace = Msf::Util::DBManager.process_opts_workspace(args, framework)
+    preserve_hosts = args[:task].options["DS_PRESERVE_HOSTS"] if args[:task].present? && args[:task].options.present?
+    wspace.update_attribute(:import_fingerprint, true)
+    existing_host_ids = wspace.hosts.map(&:id)
     data = args[:data] || args['data']
     ftype = import_filetype_detect(data)
     yield(:filetype, @import_filedata[:type]) if block
-    self.send "import_#{ftype}".to_sym, args, &block
+    self.send "import_#{ftype}".to_sym, args.merge(workspace: wspace.name), &block
+    if preserve_hosts
+      new_host_ids = Mdm::Host.where(workspace: wspace).map(&:id)
+      (new_host_ids - existing_host_ids).each do |id|
+        Mdm::Host.where(id: id).first.normalize_os
+      end
+    else
+      Mdm::Host.where(workspace: wspace).each(&:normalize_os)
+    end
+    wspace.update_attribute(:import_fingerprint, false)
   end
 
   #
@@ -96,7 +113,7 @@ module Msf::DBManager::Import
   #
   def import_file(args={}, &block)
     filename = args[:filename] || args['filename']
-    wspace = args[:wspace] || args['wspace'] || workspace
+    wspace = Msf::Util::DBManager.process_opts_workspace(args, framework)
     @import_filedata            = {}
     @import_filedata[:filename] = filename
 
@@ -133,9 +150,9 @@ module Msf::DBManager::Import
     REXML::Security.entity_expansion_text_limit = 51200
 
     if block
-      import(args.merge(:data => data)) { |type,data| yield type,data }
+      import(args.merge(data: data, workspace: wspace.name)) { |type,data| yield type,data }
     else
-      import(args.merge(:data => data))
+      import(args.merge(data: data, workspace: wspace.name))
     end
   end
 
@@ -149,6 +166,7 @@ module Msf::DBManager::Import
   # :ci_xml
   # :foundstone_xml
   # :fusionvm_xml
+  # :gpp_xml
   # :ip360_aspl_xml
   # :ip360_xml_v3
   # :ip_list
@@ -227,7 +245,7 @@ module Msf::DBManager::Import
     end
 
     # This is a text string, lets make sure its treated as binary
-    data = data.unpack("C*").pack("C*")
+    data.force_encoding(Encoding::ASCII_8BIT)
     if data and data.to_s.strip.length == 0
       raise Msf::DBImportError.new("The data provided to the import function was empty")
     end
@@ -252,6 +270,9 @@ module Msf::DBManager::Import
     elsif (firstline.index("<scanJob>"))
       @import_filedata[:type] = "Retina XML"
       return :retina_xml
+    elsif (firstline.index(/<get_results_response status=['"]200['"] status_text=['"]OK['"]>/))
+      @import_filedata[:type] = "OpenVAS XML"
+      return :openvas_new_xml
     elsif (firstline.index(/<get_reports_response status=['"]200['"] status_text=['"]OK['"]>/))
       @import_filedata[:type] = "OpenVAS XML"
       return :openvas_new_xml
@@ -267,6 +288,9 @@ module Msf::DBManager::Import
     elsif (data[0,1024] =~ /<!ATTLIST\s+items\s+burpVersion/)
       @import_filedata[:type] = "Burp Session XML"
       return :burp_session_xml
+    elsif (data[0,1024] =~ /<!ATTLIST\s+issues\s+burpVersion/)
+      @import_filedata[:type] = "Burp Issue XML"
+      return :burp_issue_xml
     elsif (firstline.index("<?xml"))
       # it's xml, check for root tags we can handle
       line_count = 0
@@ -278,10 +302,14 @@ module Msf::DBManager::Import
           @import_filedata[:type] = "Nikto XML"
           return :nikto_xml
         when "nmaprun"
-          @import_filedata[:type] = "Nmap XML"
+          if line.start_with?('<nmaprun scanner="masscan"')
+            @import_filedata[:type] = "Masscan XML"
+          else
+            @import_filedata[:type] = "Nmap XML"
+          end
           return :nmap_xml
         when "openvas-report"
-          @import_filedata[:type] = "OpenVAS Report"
+          @import_filedata[:type] = "OpenVAS"
           return :openvas_xml
         when "NessusClientData"
           @import_filedata[:type] = "Nessus XML (v1)"
@@ -333,6 +361,9 @@ module Msf::DBManager::Import
         when "main"
           @import_filedata[:type] = "Outpost24 XML"
           return :outpost24_xml
+        when /Groups|DataSources|Drives|ScheduledTasks|NTServices/
+          @import_filedata[:type] = "Group Policy Preferences Credentials"
+          return :gpp_xml
         else
           # Give up if we haven't hit the root tag in the first few lines
           break if line_count > 10

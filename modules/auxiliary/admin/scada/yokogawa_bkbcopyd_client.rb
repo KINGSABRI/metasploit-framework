@@ -1,12 +1,9 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core'
-
-class Metasploit3 < Msf::Auxiliary
-
+class MetasploitModule < Msf::Auxiliary
   include Msf::Exploit::Remote::Tcp
   include Msf::Exploit::Remote::TcpServer
   include Msf::Auxiliary::Report
@@ -23,6 +20,7 @@ class Metasploit3 < Msf::Auxiliary
         [ 'Unknown' ],
       'References'     =>
         [
+          [ 'CVE', '2014-5208' ],
           [ 'URL', 'https://community.rapid7.com/community/metasploit/blog/2014/08/09/r7-2014-10-disclosure-yokogawa-centum-cs3000-bkbcopydexe-file-system-access']
         ],
       'Actions'     =>
@@ -39,7 +37,7 @@ class Metasploit3 < Msf::Auxiliary
         Opt::RPORT(20111),
         OptString.new('RPATH', [ false, 'The Remote Path (required to RETR and STOR)', "" ]),
         OptPath.new('LPATH', [ false, 'The Local Path (required to STOR)' ])
-      ], self.class)
+      ])
   end
 
   def srvport
@@ -127,6 +125,5 @@ class Metasploit3 < Msf::Auxiliary
   def on_client_close(c)
     stop_service
   end
-
 end
 

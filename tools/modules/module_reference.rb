@@ -1,4 +1,10 @@
 #!/usr/bin/env ruby
+
+##
+# This module requires Metasploit: https://metasploit.com/download
+# Current source: https://github.com/rapid7/metasploit-framework
+##
+
 #
 # This script lists each module with its references
 #
@@ -24,7 +30,6 @@ require 'uri'
 def types
   {
     'ALL'         => '',
-    'OSVDB'       => 'http://www.osvdb.org/#{in_ctx_val}',
     'CVE'         => 'http://cvedetails.com/cve/#{in_ctx_val}/',
     'CWE'         => 'http://cwe.mitre.org/data/definitions/#{in_ctx_val}.html',
     'BID'         => 'http://www.securityfocus.com/bid/#{in_ctx_val}',
@@ -198,7 +203,7 @@ else
   columns = [ 'Module', 'Reference' ]
 end
 
-tbl = Rex::Ui::Text::Table.new(
+tbl = Rex::Text::Table.new(
   'Header'  => 'Module References',
   'Indent'  => 2,
   'Columns' => columns
@@ -207,6 +212,11 @@ tbl = Rex::Ui::Text::Table.new(
 bad_refs_count  = 0
 
 $framework.modules.each { |name, mod|
+  if mod.nil?
+    elog("module_reference.rb is unable to load #{name}")
+    next
+  end
+
   next if match and not name =~ match
 
   x = mod.new

@@ -1,14 +1,11 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-
-require 'msf/core'
 require 'msf/core/auxiliary/jtr'
 
-class Metasploit3 < Msf::Auxiliary
-
+class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::JohnTheRipper
 
   def initialize
@@ -34,6 +31,11 @@ class Metasploit3 < Msf::Auxiliary
 
     # generate our wordlist and close the file handle
     wordlist = wordlist_file
+    unless wordlist
+      print_error('This module cannot run without a database connected. Use db_connect to connect to a database.')
+      return
+    end
+
     wordlist.close
     print_status "Wordlist file written out to #{wordlist.path}"
     cracker.wordlist = wordlist.path
@@ -90,6 +92,15 @@ class Metasploit3 < Msf::Auxiliary
       hash.cores.each do |core|
         user = core.public.username
         hash_string = "#{hash.data}"
+        id = core.id
+        hashlist.puts "#{user}:#{hash_string}:#{id}:"
+      end
+    end
+    framework.db.creds(workspace: myworkspace, type: 'Metasploit::Credential::NonreplayableHash').each do |core|
+      if core.private.jtr_format =~ /mssql|mssql05|mssql12/
+        @formats << core.private.jtr_format
+        user = core.public.username
+        hash_string = core.private.data
         id = core.id
         hashlist.puts "#{user}:#{hash_string}:#{id}:"
       end

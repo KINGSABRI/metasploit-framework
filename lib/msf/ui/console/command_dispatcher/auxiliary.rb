@@ -27,9 +27,11 @@ class Auxiliary
   #
   def commands
     super.update({
-      "run"   => "Launches the auxiliary module",
-      "rerun" => "Reloads and launches the auxiliary module",
-      "exploit" => "This is an alias for the run command",
+      "run"      => "Launches the auxiliary module",
+      "rcheck"   => "Reloads the module and checks if the target is vulnerable",
+      "rerun"    => "Reloads and launches the auxiliary module",
+      "exploit"  => "This is an alias for the run command",
+      "recheck"  => "This is an alias for the rcheck command",
       "rexploit" => "This is an alias for the rerun command",
       "reload"   => "Reloads the auxiliary module"
     }).merge( (mod ? mod.auxiliary_commands : {}) )
@@ -72,38 +74,44 @@ class Auxiliary
   # Executes an auxiliary module
   #
   def cmd_run(*args)
-    defanged?
-
-    opt_str = nil
+    opts    = []
     action  = mod.datastore['ACTION']
     jobify  = false
     quiet   = false
 
-    @@auxiliary_opts.parse(args) { |opt, idx, val|
+    @@auxiliary_opts.parse(args) do |opt, idx, val|
       case opt
-        when '-j'
-          jobify = true
-        when '-o'
-          opt_str = val
-        when '-a'
-          action = val
-        when '-q'
-          quiet  = true
-        when '-h'
+      when '-j'
+        jobify = true
+      when '-o'
+        opts.push(val)
+      when '-a'
+        action = val
+      when '-q'
+        quiet  = true
+      when '-h'
+        cmd_run_help
+        return false
+      else
+        if val[0] != '-' && val.match?('=')
+          opts.push(val)
+        else
           cmd_run_help
           return false
+        end
       end
-    }
+    end
 
     # Always run passive modules in the background
-    if (mod.passive or mod.passive_action?(action))
+    if mod.is_a?(Msf::Module::HasActions) &&
+        (mod.passive || mod.passive_action?(action || mod.default_action))
       jobify = true
     end
 
     begin
       mod.run_simple(
         'Action'         => action,
-        'OptionStr'      => opt_str,
+        'OptionStr'      => opts.join(','),
         'LocalInput'     => driver.input,
         'LocalOutput'    => driver.output,
         'RunAsJob'       => jobify,
@@ -131,8 +139,8 @@ class Auxiliary
       return false
     end
 
-    if (jobify)
-      print_status("Auxiliary module running as background job")
+    if (jobify && mod.job_id)
+      print_status("Auxiliary module running as background job #{mod.job_id}.")
     else
       print_status("Auxiliary module execution completed")
     end
@@ -148,6 +156,18 @@ class Auxiliary
   end
 
   alias cmd_exploit_help cmd_run_help
+
+  #
+  # Reloads an auxiliary module and checks the target to see if it's
+  # vulnerable.
+  #
+  def cmd_rcheck(*args)
+    reload()
+
+    cmd_check(*args)
+  end
+
+  alias cmd_recheck cmd_rcheck
 
 end
 

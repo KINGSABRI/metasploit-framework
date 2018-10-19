@@ -1,7 +1,10 @@
 #!/usr/bin/env ruby
-#
-# $Id$
-# $Revision$
+
+##
+# This module requires Metasploit: https://metasploit.com/download
+# Current source: https://github.com/rapid7/metasploit-framework
+##
+
 #
 # This script lists each module by its disclosure date
 #
@@ -105,7 +108,7 @@ end
 $framework = Msf::Simple::Framework.create(framework_opts)
 
 
-tbl = Rex::Ui::Text::Table.new(
+tbl = Rex::Text::Table.new(
   'Header'  => 'Module References',
   'Indent'  => Indent.length,
   'Columns' => [ 'Module', 'Disclosure Date' ]

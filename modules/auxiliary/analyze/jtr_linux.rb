@@ -1,14 +1,11 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-
-require 'msf/core'
 require 'msf/core/auxiliary/jtr'
 
-class Metasploit3 < Msf::Auxiliary
-
+class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::JohnTheRipper
 
   def initialize
@@ -38,15 +35,20 @@ class Metasploit3 < Msf::Auxiliary
 
   def run
 
-    formats = [ 'md5', 'des', 'bsdi']
+    formats = [ 'md5crypt', 'descrypt', 'bsdicrypt']
     if datastore['Crypt']
-      format << 'crypt'
+      formats << 'crypt'
     end
 
     cracker = new_john_cracker
 
     # generate our wordlist and close the file handle
     wordlist = wordlist_file
+    unless wordlist
+      print_error('This module cannot run without a database connected. Use db_connect to connect to a database.')
+      return
+    end
+
     wordlist.close
     print_status "Wordlist file written out to #{wordlist.path}"
     cracker.wordlist = wordlist.path
@@ -85,10 +87,10 @@ class Metasploit3 < Msf::Auxiliary
 
   def hash_file
     hashlist = Rex::Quickfile.new("hashes_tmp")
-    Metasploit::Credential::NonreplayableHash.joins(:cores).where(metasploit_credential_cores: { workspace_id: myworkspace.id }, jtr_format: 'md5,des,bsdi,crypt').each do |hash|
-      hash.cores.each do |core|
+    framework.db.creds(workspace: myworkspace, type: 'Metasploit::Credential::NonreplayableHash').each do |core|
+      if core.private.jtr_format =~ /md5|des|bsdi|crypt/
         user = core.public.username
-        hash_string = "#{hash.data}"
+        hash_string = core.private.data
         id = core.id
         hashlist.puts "#{user}:#{hash_string}:::::#{id}:"
       end

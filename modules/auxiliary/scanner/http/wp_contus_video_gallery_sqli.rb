@@ -1,12 +1,9 @@
 ##
-# This module requires Metasploit: http://metasploit.com/download
+# This module requires Metasploit: https://metasploit.com/download
 # Current source: https://github.com/rapid7/metasploit-framework
 ##
 
-require 'msf/core'
-
-class Metasploit4 < Msf::Auxiliary
-
+class MetasploitModule < Msf::Auxiliary
   include Msf::Exploit::Remote::HTTP::Wordpress
   include Msf::Auxiliary::Scanner
   include Msf::Auxiliary::Report
@@ -38,7 +35,7 @@ class Metasploit4 < Msf::Auxiliary
     left_marker = Rex::Text.rand_text_alpha(5)
     flag = Rex::Text.rand_text_alpha(5)
 
-    vprint_status("#{peer} - Checking host")
+    vprint_status("Checking host")
 
     res = send_request_cgi({
       'uri'       => wordpress_url_admin_ajax,
@@ -49,14 +46,14 @@ class Metasploit4 < Msf::Auxiliary
       }
     })
     unless res && res.body
-      vprint_error("#{peer} - Server did not respond in an expected way")
+      vprint_error("Server did not respond in an expected way")
       return
     end
 
     result = res.body =~ /#{left_marker}#{flag}#{right_marker}/
 
     if result
-      print_good("#{peer} - Vulnerable to unauthenticated SQL injection within Contus Video Gallery 2.7 for Wordpress")
+      print_good("Vulnerable to unauthenticated SQL injection within Contus Video Gallery 2.7 for Wordpress")
       report_vuln({
         :host  => rhost,
         :port  => rport,

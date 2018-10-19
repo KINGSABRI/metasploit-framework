@@ -16,6 +16,8 @@ module SocketSubsystem
 
 class TcpServerChannel < Rex::Post::Meterpreter::Channel
 
+  include Rex::IO::StreamServer
+
   #
   # This is a class variable to store all pending client tcp connections which have not been passed
   # off via a call to the respective server tcp channels accept method. The dictionary key is the
@@ -79,21 +81,15 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
   def self.open(client, params)
     c = Channel.create(client, 'stdapi_net_tcp_server', self, CHANNEL_FLAG_SYNCHRONOUS,
       [
-        {
-        'type'  => TLV_TYPE_LOCAL_HOST,
-        'value' => params.localhost
-        },
-        {
-        'type'  => TLV_TYPE_LOCAL_PORT,
-        'value' => params.localport
-        }
+        {'type'  => TLV_TYPE_LOCAL_HOST, 'value' => params.localhost},
+        {'type'  => TLV_TYPE_LOCAL_PORT, 'value' => params.localport}
       ] )
     c.params = params
     c
   end
 
   #
-  # Simply initilize this instance.
+  # Simply initialize this instance.
   #
   def initialize(client, cid, type, flags)
     super(client, cid, type, flags)
@@ -110,7 +106,7 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
   end
 
   #
-  # Accept a new tcp client connection form this tcp server channel. This method will block indefinatly
+  # Accept a new tcp client connection form this tcp server channel. This method will block indefinitely
   # if no timeout is specified.
   #
   def accept(opts = {})
@@ -135,14 +131,18 @@ protected
   def _accept(nonblock = false)
     result = nil
 
-    channel = @@server_channels[self].deq(nonblock)
+    begin
+      channel = @@server_channels[self].deq(nonblock)
 
-    if channel
-      result = channel.lsock
-    end
+      if channel
+        result = channel.lsock
+      end
 
-    if result != nil && !result.kind_of?(Rex::Socket::Tcp)
-      result.extend(Rex::Socket::Tcp)
+      if result != nil && !result.kind_of?(Rex::Socket::Tcp)
+        result.extend(Rex::Socket::Tcp)
+      end
+    rescue ThreadError
+      # This happens when there's no clients in the queue
     end
 
     result

@@ -2,6 +2,11 @@
 require 'builder'
 
 RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
+
+  if ENV['REMOTE_DB']
+    before {skip("Awaiting a port of all components")}
+  end
+
   # Serialized format from pro/modules/auxiliary/pro/report.rb
   def serialize(object)
     # FIXME https://www.pivotaltracker.com/story/show/46578647
@@ -27,7 +32,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
   end
 
   let(:document) do
-    REXML::Document.new(source)
+    Nokogiri::XML::Reader.from_memory(source)
   end
 
   let(:element) do
@@ -35,7 +40,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
   end
 
   let(:host_attributes) do
-    FactoryGirl.attributes_for(:mdm_host)
+    FactoryBot.attributes_for(:mdm_host)
   end
 
   let(:msf_web_text_element_names) do
@@ -65,15 +70,15 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
   end
 
   let(:service_attributes) do
-    FactoryGirl.attributes_for(:web_service)
+    FactoryBot.attributes_for(:web_service)
   end
 
   let(:web_form_attributes) do
-    FactoryGirl.attributes_for(:mdm_web_form, :exported)
+    FactoryBot.attributes_for(:mdm_web_form, :exported)
   end
 
   let(:web_page_attributes) do
-    FactoryGirl.attributes_for(:mdm_web_page)
+    FactoryBot.attributes_for(:mdm_web_page)
   end
 
   let(:workspace) do
@@ -132,7 +137,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
     end
 
     subject(:metadata) do
-      db_manager.send(:check_msf_xml_version!, document)
+      db_manager.send(:check_msf_xml_version!, Nokogiri::XML(document.source).elements.first.name)
     end
 
     it_should_behave_like(
@@ -175,7 +180,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
   context '#import_msf_text_element' do
     let(:parent_element) do
-      document.root
+      Nokogiri::XML(document.source).elements.first
     end
 
     let(:child_name) do
@@ -252,7 +257,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
   context 'import_msf_web_element' do
     let(:element) do
-      document.root
+      Nokogiri::XML(document.source).elements.first
     end
 
     let(:options) do
@@ -304,7 +309,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
       end
 
       let(:web_vuln) do
-        FactoryGirl.create(:mdm_web_vuln)
+        FactoryBot.create(:mdm_web_vuln)
       end
 
       before(:example) do
@@ -345,7 +350,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
       context 'without :workspace' do
         let(:workspace) do
-          FactoryGirl.create(:mdm_workspace)
+          FactoryBot.create(:mdm_workspace)
         end
 
         before(:example) do
@@ -575,11 +580,12 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
     end
 
     context 'call to #import_msf_web_element' do
+
       it_should_behave_like 'Msf::DBManager::Import::MetasploitFramework::XML#import_msf_web_element specialization'
 
       context 'specialization return' do
         let(:element) do
-          document.root
+          Nokogiri::XML(document.source).elements.first
         end
 
         let(:source) do
@@ -619,7 +625,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
     context 'with required attributes' do
       let(:element) do
-        document.root
+        Nokogiri::XML(document.source).elements.first
       end
 
       let(:source) do
@@ -675,7 +681,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
       context 'specialization return' do
         let(:element) do
-          document.root
+          Nokogiri::XML(document.source).elements.first
         end
 
         let(:source) do
@@ -774,7 +780,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
     context 'with required attributes' do
       let(:element) do
-        document.root
+        Nokogiri::XML(document.source).elements.first
       end
 
       let(:source) do
@@ -830,7 +836,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
     end
 
     let(:web_vuln_attributes) do
-      FactoryGirl.attributes_for(:exported_web_vuln)
+      FactoryBot.attributes_for(:exported_web_vuln)
     end
 
     subject(:import_msf_web_vuln_element) do
@@ -846,7 +852,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
       context 'specialization return' do
         let(:element) do
-          document.root
+          Nokogiri::XML(document.source).elements.first
         end
 
         let(:source) do
@@ -949,7 +955,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
 
     context 'with required attributes' do
       let(:element) do
-        document.root
+        Nokogiri::XML(document.source).elements.first
       end
 
       let(:source) do
@@ -1149,7 +1155,7 @@ RSpec.shared_examples_for 'Msf::DBManager::Import::MetasploitFramework::XML' do
       end
 
       let(:web_vuln) do
-        FactoryGirl.create(:mdm_web_vuln)
+        FactoryBot.create(:mdm_web_vuln)
       end
 
       it 'should call #import_msf_web_vuln_element' do

@@ -15,50 +15,51 @@ class CommandStream
     attr_accessor :localinfo
   end
 
-  def initialize(ssh, cmd, cleanup = false)
+  def shell_requested(channel, success)
+    raise "could not request ssh shell" unless success
+    channel[:data] = ''
 
+    channel.on_eof do
+      cleanup
+    end
+
+    channel.on_close do
+      cleanup
+    end
+
+    channel.on_data do |ch,data|
+      self.rsock.write(data)
+    end
+
+    channel.on_extended_data do |ch, ctype, data|
+      self.rsock.write(data)
+    end
+
+    self.channel = channel
+  end
+
+  def initialize(ssh, cmd = nil, pty: false, cleanup: false)
     self.lsock, self.rsock = Rex::Socket.tcp_socket_pair()
     self.lsock.extend(Rex::IO::Stream)
     self.lsock.extend(PeerInfo)
     self.rsock.extend(Rex::IO::Stream)
 
     self.ssh = ssh
-    self.thread = Thread.new(ssh,cmd,cleanup) do |rssh,rcmd,rcleanup|
-
+    self.thread = Thread.new(ssh, cmd, pty, cleanup) do |rssh, rcmd, rpty, rcleanup|
       begin
-        info = rssh.transport.socket.getpeername
+        info = rssh.transport.socket.getpeername_as_array
         self.lsock.peerinfo  = "#{info[1]}:#{info[2]}"
 
         info = rssh.transport.socket.getsockname
         self.lsock.localinfo = "#{info[1]}:#{info[2]}"
 
         rssh.open_channel do |rch|
-          rch.exec(rcmd) do |c, success|
-            raise "could not execute command: #{rcmd.inspect}" unless success
-
-            c[:data] = ''
-
-            c.on_eof do
-              self.rsock.close rescue nil
-              self.ssh.close rescue nil
-              self.thread.kill
-            end
-
-            c.on_close do
-              self.rsock.close rescue nil
-              self.ssh.close rescue nil
-              self.thread.kill
-            end
-
-            c.on_data do |ch,data|
-              self.rsock.write(data)
-            end
-
-            c.on_extended_data do |ch, ctype, data|
-              self.rsock.write(data)
-            end
-
-            self.channel = c
+          # A PTY will write us to {u,w}tmp and lastlog
+          rch.request_pty if rpty
+          if rcmd.nil?
+            rch.send_channel_request("shell", &method(:shell_requested))
+          else
+            rch.exec(rcmd, &method(:shell_requested))
           end
         end
 
@@ -85,7 +86,7 @@ class CommandStream
       end
 
       # Shut down the SSH session if requested
-      if(rcleanup)
+      if !rcmd.nil? && rcleanup
         rssh.close
       end
     end
@@ -99,6 +100,14 @@ class CommandStream
       raise EOFError if ! self.thread.alive?
       ::IO.select(nil, nil, nil, 0.10)
     end
+  end
+
+  def cleanup
+    self.monitor.kill
+    self.lsock.close rescue nil
+    self.rsock.close rescue nil
+    self.ssh.close rescue nil
+    self.thread.kill
   end
 
 end

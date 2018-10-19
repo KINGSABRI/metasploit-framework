@@ -1,4 +1,10 @@
 #!/usr/bin/env ruby
+
+##
+# This module requires Metasploit: https://metasploit.com/download
+# Current source: https://github.com/rapid7/metasploit-framework
+##
+
 #
 # This script updates the CachedSize constants in payload modules
 #
@@ -12,6 +18,8 @@ $:.unshift(File.expand_path(File.join(File.dirname(msfbase), '..', '..', 'lib'))
 require 'msfenv'
 
 $:.unshift(ENV['MSF_LOCAL_LIB']) if ENV['MSF_LOCAL_LIB']
+
+gem 'rex-text'
 
 require 'rex'
 require 'msf/ui'
@@ -29,4 +37,3 @@ framework.payloads.each_module do |name, mod|
   $stdout.puts "[*] Updating the CacheSize for #{mod.file_path}..."
   Msf::Util::PayloadCachedSize.update_module_cached_size(mod_inst)
 end
-
